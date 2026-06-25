@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RELOAD // EMULATOR</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23ffffff'/><stop offset='100%25' style='stop-color:%23888888'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23g)'/><text x='50' y='68' text-anchor='middle' font-size='55' font-weight='900' fill='black' font-family='Arial'>R</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #000000;
+            --bg2: #050505;
+            --primary: #ffffff;
+            --secondary: #777777;
+            --accent: #ffffff;
+            --accent2: #aaaaaa;
+            --glass: rgba(0, 0, 0, 0.85);
+            --border: rgba(255, 255, 255, 0.06);
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+            --glow: 0 0 40px rgba(255, 255, 255, 0.02);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* ===== 3D ЖИВЫЕ ОБОИ (ВЕСЬ ЭКРАН) ===== */
+        #three-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            display: block;
+        }
+
+        .glow-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.08;
+            animation: orbFloat 30s ease-in-out infinite;
+        }
+        .glow-orb:nth-child(1) {
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.07), transparent);
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+        .glow-orb:nth-child(2) {
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(150, 150, 150, 0.05), transparent);
+            bottom: -300px;
+            right: -300px;
+            animation-delay: -10s;
+        }
+        .glow-orb:nth-child(3) {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.04), transparent);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -20s;
+        }
+        .glow-orb:nth-child(4) {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(100, 100, 100, 0.04), transparent);
+            top: 20%;
+            right: 10%;
+            animation-delay: -5s;
+        }
+        .glow-orb:nth-child(5) {
+            width: 550px;
+            height: 550px;
+            background: radial-gradient(circle, rgba(200, 200, 200, 0.03), transparent);
+            bottom: 30%;
+            left: 10%;
+            animation-delay: -15s;
+        }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            25% { transform: translate(100px, -60px) scale(1.2) rotate(5deg); }
+            50% { transform: translate(-50px, 70px) scale(0.8) rotate(-3deg); }
+            75% { transform: translate(60px, -40px) scale(1.1) rotate(3deg); }
+        }
+
+        .noise {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* ===== ПРЕЛОАДЕР ===== */
+        .preloader {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        .preloader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .preloader-scene {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+        }
+
+        .preloader-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            animation: ringSpin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+        .preloader-ring:nth-child(1) {
+            inset: 0;
+            border-top-color: #ffffff;
+            border-right-color: #888888;
+        }
+        .preloader-ring:nth-child(2) {
+            inset: 15px;
+            border-bottom-color: #ffffff;
+            border-left-color: #888888;
+            animation-duration: 0.9s;
+            animation-direction: reverse;
+        }
+        .preloader-ring:nth-child(3) {
+            inset: 30px;
+            border-top-color: #aaaaaa;
+            border-right-color: #ffffff;
+            animation-duration: 0.7s;
+        }
+        @keyframes ringSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preloader-logo {
+            font-size: 4.5rem;
+            font-weight: 900;
+            letter-spacing: 14px;
+            background: linear-gradient(90deg, #ffffff, #888888, #ffffff);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: logoShine 2.5s linear infinite;
+            margin-bottom: 0.5rem;
+        }
+        @keyframes logoShine {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .preloader-bar {
+            width: 320px;
+            height: 2px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 1.5rem;
+            position: relative;
+        }
+        .preloader-bar::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, #ffffff, #888888, transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+        }
+        .preloader-bar-inner {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffffff, #888888);
+            border-radius: 4px;
+            animation: loadBar 2.8s ease-in-out forwards;
+            position: relative;
+            z-index: 1;
+        }
+        @keyframes loadBar {
+            0% { width: 0%; }
+            20% { width: 18%; }
+            45% { width: 42%; }
+            70% { width: 72%; }
+            100% { width: 100%; }
+        }
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .preloader-text {
+            margin-top: 1.2rem;
+            font-size: 0.7rem;
+            color: var(--secondary);
+            letter-spacing: 6px;
+            animation: pulseText 1.5s ease-in-out infinite;
+        }
+        @keyframes pulseText {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        .preloader-percent {
+            font-size: 1.4rem;
+            font-weight: 300;
+            color: #ffffff;
+            margin-top: 0.2rem;
+            letter-spacing: 3px;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 40px rgba(255,255,255,0.05);
+        }
+
+        /* ===== ОСНОВНОЙ ИНТЕРФЕЙС ===== */
+        .interface {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            min-height: 100vh;
+            padding: 2rem 2rem 1rem 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.96) translateY(20px);
+            transition: all 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .interface.visible {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0 1.5rem 0;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 2.2rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            background: linear-gradient(90deg, #ffffff, #888888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo small {
+            font-size: 0.7rem;
+            font-weight: 300;
+            color: var(--secondary);
+            -webkit-text-fill-color: var(--secondary);
+            letter-spacing: 2px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            color: var(--secondary);
+            padding: 0.35rem 0.8rem;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            letter-spacing: 0.5px;
+        }
+        .ctrl-btn:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .ctrl-btn i {
+            font-size: 0.8rem;
+        }
+
+        .header-link {
+            color: var(--secondary);
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 600;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 0.35rem 0.8rem;
+            border-radius: 50px;
+            border: 1px solid transparent;
+        }
+        .header-link:hover {
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .header-link i {
+            font-size: 0.8rem;
+        }
+
+        .header-link.creator {
+            color: #aaaaaa;
+        }
+        .header-link.creator:hover {
+            color: #ffffff;
+        }
+
+        .header-link.reviews {
+            color: #999999;
+        }
+        .header-link.reviews:hover {
+            color: #ffffff;
+        }
+
+        /* ===== ОСНОВНОЙ КОНТЕНТ ===== */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            padding: 2rem 0 1.5rem 0;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        .info-block h1 {
+            font-size: 4.5rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -2px;
+            margin-bottom: 1rem;
+        }
+        .info-block h1 span {
+            color: #aaaaaa;
+        }
+
+        .animated-desc {
+            color: var(--secondary);
+            font-size: 1.1rem;
+            line-height: 1.8;
+            max-width: 450px;
+            margin-bottom: 2rem;
+            position: relative;
+            min-height: 3.6rem;
+        }
+        .animated-desc .text-line {
+            display: block;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeUp 0.6s ease forwards;
+        }
+        .animated-desc .text-line:nth-child(1) { animation-delay: 0.3s; }
+        .animated-desc .text-line:nth-child(2) { animation-delay: 0.6s; }
+        .animated-desc .text-line:nth-child(3) { animation-delay: 0.9s; }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animated-desc .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2rem;
+            background: #ffffff;
+            margin-left: 2px;
+            vertical-align: text-bottom;
+            animation: blink 0.8s step-end infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 5px 14px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.7rem;
+            color: #aaaaaa;
+            margin-bottom: 1.2rem;
+        }
+        .status-dot {
+            width: 5px;
+            height: 5px;
+            background: #888888;
+            border-radius: 50%;
+            animation: pulseDot 2s infinite;
+        }
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.8); }
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+            margin-top: 0.8rem;
+        }
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.5rem 0.9rem;
+            background: rgba(255,255,255,0.01);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            transition: 0.3s;
+            color: var(--secondary);
+            font-size: 0.8rem;
+        }
+        .feature-item:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+            color: var(--primary);
+            transform: translateX(3px);
+        }
+        .feature-item i {
+            color: #888888;
+            width: 16px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        /* ===== КАРТОЧКА ПОКУПКИ ===== */
+        .buy-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            backdrop-filter: blur(30px);
+            box-shadow: var(--shadow);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .buy-card::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.01) 0%, transparent 60%);
+            animation: glowRotate 25s linear infinite;
+        }
+        @keyframes glowRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .buy-card .price {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #ffffff;
+            position: relative;
+        }
+        .buy-card .price small {
+            font-size: 1.2rem;
+            color: var(--secondary);
+            font-weight: 400;
+        }
+        .buy-card .price-label {
+            color: var(--secondary);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            margin-bottom: 0.3rem;
+        }
+
+        .buy-btn {
+            width: 100%;
+            padding: 1.2rem;
+            margin-top: 1.5rem;
+            background: rgba(255,255,255,0.05);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+        .buy-btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.03), transparent);
+            transform: rotate(45deg) translateX(-100%);
+            transition: 0.5s;
+        }
+        .buy-btn:hover::after {
+            transform: rotate(45deg) translateX(100%);
+        }
+        .buy-btn:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-features {
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+        .card-features .cf-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.35rem 0;
+            color: var(--secondary);
+            font-size: 0.85rem;
+        }
+        .card-features .cf-item i {
+            color: #666666;
+            width: 16px;
+            font-size: 0.8rem;
+        }
+
+        /* ===== ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ ===== */
+        .agreement-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        .agreement-overlay.active {
+            display: flex;
+        }
+
+        .agreement-box {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            backdrop-filter: blur(30px);
+            box-shadow: var(--shadow);
+            animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .agreement-box::-webkit-scrollbar {
+            width: 4px;
+        }
+        .agreement-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .agreement-box::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .agreement-box .agreement-icon {
+            font-size: 2.5rem;
+            color: #888888;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .agreement-box h2 {
+            text-align: center;
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 0.3rem;
+            color: #ffffff;
+        }
+        .agreement-box .agreement-sub {
+            text-align: center;
+            color: var(--secondary);
+            font-size: 0.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .agreement-content {
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+        .agreement-content::-webkit-scrollbar {
+            width: 3px;
+        }
+        .agreement-content::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.08);
+            border-radius: 4px;
+        }
+
+        .agreement-content .agreement-section {
+            margin-bottom: 1.2rem;
+        }
+        .agreement-content .agreement-section h3 {
+            font-size: 0.9rem;
+            color: #aaaaaa;
+            margin-bottom: 0.3rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .agreement-content .agreement-section p {
+            font-size: 0.8rem;
+            color: var(--secondary);
+            line-height: 1.7;
+        }
+        .agreement-content .agreement-section ul {
+            list-style: none;
+            padding: 0;
+        }
+        .agreement-content .agreement-section ul li {
+            font-size: 0.8rem;
+            color: var(--secondary);
+            line-height: 1.7;
+            padding-left: 1.2rem;
+            position: relative;
+        }
+        .agreement-content .agreement-section ul li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #666666;
+        }
+
+        .agreement-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 1.5rem 0 1rem 0;
+            padding: 0.8rem 1rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .agreement-check:hover {
+            border-color: rgba(255,255,255,0.08);
+        }
+        .agreement-check input[type="checkbox"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 1px;
+            position: relative;
+        }
+        .agreement-check input[type="checkbox"]:checked {
+            background: rgba(255,255,255,0.1);
+            border-color: #ffffff;
+        }
+        .agreement-check input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: #ffffff;
+            font-size: 16px;
+        }
+        .agreement-check label {
+            color: var(--secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .agreement-check label strong {
+            color: #aaaaaa;
+        }
+
+        .agreement-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+        .agreement-actions button {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .agreement-actions .btn-agree {
+            background: rgba(255,255,255,0.08);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .agreement-actions .btn-agree:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        .agreement-actions .btn-agree:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .agreement-actions .btn-cancel {
+            background: transparent;
+            color: var(--secondary);
+            border: 1px solid var(--border);
+        }
+        .agreement-actions .btn-cancel:hover {
+            border-color: rgba(255,255,255,0.15);
+            color: #ffffff;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            border-top: 1px solid var(--border);
+            padding: 1rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            color: var(--secondary);
+            font-size: 0.7rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .footer-links {
+            display: flex;
+            gap: 1.2rem;
+        }
+        .footer-links a {
+            color: var(--secondary);
+            text-decoration: none;
+            transition: 0.3s;
+        }
+        .footer-links a:hover {
+            color: #ffffff;
+        }
+
+        /* ===== АДАПТИВ ===== */
+        @media (max-width: 1024px) {
+            .main-grid {
+                gap: 2rem;
+            }
+            .info-block h1 {
+                font-size: 3.5rem;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+                padding: 1.5rem 0;
+            }
+            .info-block h1 {
+                font-size: 3rem;
+            }
+            .animated-desc {
+                max-width: 100%;
+            }
+            .features-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .header-controls {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .buy-card .price {
+                font-size: 2.8rem;
+            }
+            .interface {
+                padding: 1.2rem;
+            }
+            .agreement-box {
+                padding: 1.5rem;
+                max-height: 95vh;
+            }
+            .agreement-actions {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 500px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            .interface {
+                padding: 0.8rem;
+            }
+            .info-block h1 {
+                font-size: 2.2rem;
+            }
+            .logo {
+                font-size: 1.6rem;
+                letter-spacing: 2px;
+            }
+            .header-controls {
+                gap: 0.3rem;
+            }
+            .ctrl-btn {
+                font-size: 0.55rem;
+                padding: 0.2rem 0.5rem;
+            }
+            .header-link {
+                font-size: 0.55rem;
+                padding: 0.2rem 0.5rem;
+            }
+            .buy-card {
+                padding: 1.5rem;
+            }
+            .buy-card .price {
+                font-size: 2.2rem;
+            }
+            .buy-btn {
+                font-size: 0.9rem;
+                padding: 1rem;
+            }
+            .footer {
+                flex-direction: column;
+                text-align: center;
+                font-size: 0.6rem;
+            }
+            .footer-links {
+                gap: 0.8rem;
+            }
+            .preloader-logo {
+                font-size: 2.5rem;
+                letter-spacing: 8px;
+            }
+            .preloader-bar {
+                width: 200px;
+            }
+            .glow-orb {
+                display: none;
+            }
+            .feature-item {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.7rem;
+            }
+            .animated-desc {
+                font-size: 0.95rem;
+            }
+            .agreement-box h2 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== 3D ЖИВЫЕ ОБОИ (ВЕСЬ ЭКРАН) ===== -->
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <canvas id="three-canvas"></canvas>
+    <div class="noise"></div>
+
+    <!-- ===== ПРЕЛОАДЕР ===== -->
+    <div class="preloader" id="preloader">
+        <div class="preloader-logo">RELOAD</div>
+        <div class="preloader-scene">
+            <div class="preloader-ring"></div>
+            <div class="preloader-ring"></div>
+            <div class="preloader-ring"></div>
+        </div>
+        <div class="preloader-bar">
+            <div class="preloader-bar-inner"></div>
+        </div>
+        <div class="preloader-percent" id="preloaderPercent">0%</div>
+        <div class="preloader-text">ЗАГРУЗКА СИСТЕМЫ</div>
+    </div>
+
+    <!-- ===== ОСНОВНОЙ ИНТЕРФЕЙС ===== -->
+    <div class="interface" id="interface">
+        
+        <!-- HEADER -->
+        <header class="header">
+            <div class="logo">
+                RELOAD
+                <small>EMULATOR</small>
+            </div>
+            <div class="header-controls">
+                <button class="ctrl-btn" id="langToggle">
+                    <i class="fas fa-globe"></i> <span id="langLabel">RU</span>
+                </button>
+                <button class="ctrl-btn" id="currencyToggle">
+                    <i class="fas fa-dollar-sign"></i> <span id="currencyLabel">₽</span>
+                </button>
+                <a href="https://t.me/lnjectes" target="_blank" class="header-link creator">
+                    <i class="fas fa-user"></i> Хейви
+                </a>
+                <a href="https://t.me/ianchikexe" target="_blank" class="header-link creator">
+                    <i class="fas fa-user"></i> Ianchik
+                </a>
+                <a href="https://t.me/ianchikreviews" target="_blank" class="header-link reviews">
+                    <i class="fas fa-star"></i> Отзывы
+                </a>
+            </div>
+        </header>
+
+        <!-- MAIN -->
+        <div class="main-grid">
+            <div class="info-block">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">RELOAD • v3.0</span>
+                </div>
+                <h1>Эмулятор <span>RELOAD</span></h1>
+                <div class="animated-desc" id="descContainer">
+                    <span class="text-line" id="descLine1">Мощный, стабильный и современный</span>
+                    <span class="text-line" id="descLine2">эмулятор для ПК. Максимальная</span>
+                    <span class="text-line" id="descLine3">производительность и полный контроль.</span>
+                    <span class="cursor"></span>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-item"><i class="fas fa-palette"></i> <span class="f-text">Кастомный дизайн</span></div>
+                    <div class="feature-item"><i class="fas fa-cogs"></i> <span class="f-text">Оптимизация конфигов</span></div>
+                    <div class="feature-item"><i class="fas fa-rocket"></i> <span class="f-text">Анлок фпса по бинду</span></div>
+                    <div class="feature-item"><i class="fas fa-check-circle"></i> <span class="f-text">Вылетов полностью нету</span></div>
+                    <div class="feature-item"><i class="fas fa-crosshairs"></i> <span class="f-text">Добавлен прицел (настраиваемый)</span></div>
+                    <div class="feature-item"><i class="fas fa-microchip"></i> <span class="f-text">Улучшен движок и андроид</span></div>
+                    <div class="feature-item"><i class="fas fa-discord"></i> <span class="f-text">Discord RPC</span></div>
+                    <div class="feature-item"><i class="fas fa-keyboard"></i> <span class="f-text">Настраиваемые бинды</span></div>
+                    <div class="feature-item"><i class="fas fa-ban"></i> <span class="f-text">Вырезана реклама полностью</span></div>
+                    <div class="feature-item"><i class="fas fa-download"></i> <span class="f-text">Удобный автоустановщик</span></div>
+                    <div class="feature-item"><i class="fas fa-shield-alt"></i> <span class="f-text">Нету синих экранов на Windows 11</span></div>
+                </div>
+            </div>
+
+            <div class="buy-card">
+                <div class="price-label" id="priceLabel">ЦЕНА</div>
+                <div class="price"><span id="priceDisplay">550</span> <small id="currencySymbol">₽</small></div>
+                
+                <div class="card-features">
+                    <div class="cf-item"><i class="fas fa-check"></i> <span class="cf-text">Полный доступ ко всем функциям</span></div>
+                    <div class="cf-item"><i class="fas fa-check"></i> <span class="cf-text">Бесплатные обновления</span></div>
+                    <div class="cf-item"><i class="fas fa-check"></i> <span class="cf-text">Техническая поддержка 24/7</span></div>
+                    <div class="cf-item"><i class="fas fa-check"></i> <span class="cf-text">Без скрытых платежей</span></div>
+                </div>
+
+                <button class="buy-btn" id="buyBtn">
+                    <i class="fas fa-shopping-cart" style="margin-right: 8px;"></i> <span id="buyText">КУПИТЬ</span>
+                </button>
+
+                <div style="margin-top: 0.8rem; font-size: 0.65rem; color: var(--secondary);">
+                    <i class="fas fa-lock"></i> <span id="secureText">Безопасная оплата через Telegram</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <span>© 2026 RELOAD Emulator. Все права защищены.</span>
+            <div class="footer-links">
+                <a href="https://t.me/lnjectes" target="_blank">Хейви</a>
+                <a href="https://t.me/ianchikexe" target="_blank">Ianchik</a>
+                <a href="https://t.me/ianchikreviews" target="_blank">Отзывы</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ===== ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ ===== -->
+    <div class="agreement-overlay" id="agreementOverlay">
+        <div class="agreement-box">
+            <div class="agreement-icon"><i class="fas fa-file-contract"></i></div>
+            <h2>ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ</h2>
+            <p class="agreement-sub">Пожалуйста, ознакомьтесь с условиями перед покупкой</p>
+
+            <div class="agreement-content">
+                <div class="agreement-section">
+                    <h3>1. Предмет соглашения</h3>
+                    <p>Мы предлагаем программные решения и консультации, направленные на ускорение и улучшение производительности вашего компьютера. Важно понимать, что мы не являемся производителем или разработчиком операционных систем или аппаратного обеспечения. Наши услуги направлены на оптимизацию существующих настроек и программ.</p>
+                </div>
+
+                <div class="agreement-section">
+                    <h3>2. Ответственность сторон</h3>
+                    <p>Покупатель принимает на себя полную ответственность за состояние своего компьютера. Служба поддержки нашей компании не несет ответственности за любые неисправности, сбои, потерю данных или другие негативные последствия, которые могут возникнуть в процессе или после применения наших оптимизаций. Мы не можем гарантировать совместимость наших решений со всеми конфигурациями программного обеспечения и оборудования, а также с любыми сторонними программами, установленными на вашем устройстве.</p>
+                </div>
+
+                <div class="agreement-section">
+                    <h3>3. Политика возврата средств</h3>
+                    <p>В соответствии с характером предоставляемых нами нематериальных услуг (цифровые продукты, консультации, удаленная помощь), возврат денежных средств за приобретенные оптимизации не предусмотрен. Мы вкладываем значительные ресурсы в разработку и поддержку наших решений. Получив доступ к услуге или скачав цифровой продукт, вы тем самым подтверждаете свое согласие с данным условием.</p>
+                </div>
+
+                <div class="agreement-section">
+                    <h3>4. Обязательства покупателя</h3>
+                    <p>Приобретая наши услуги, вы подтверждаете, что:</p>
+                    <ul>
+                        <li>Вы полностью осознаете риски, связанные с внесением изменений в настройки вашего компьютера.</li>
+                        <li>Вы самостоятельно несете ответственность за резервное копирование всех важных данных перед применением каких-либо оптимизаций.</li>
+                        <li>Вы согласны с тем, что гарантия на ваше оборудование или программное обеспечение может быть аннулирована производителем в результате самостоятельного вмешательства, включая применение наших оптимизаций.</li>
+                    </ul>
+                </div>
+
+                <div class="agreement-section">
+                    <h3>5. Завершение соглашения</h3>
+                    <p>Используя наш сайт и приобретая наши услуги, вы выражаете полное согласие с условиями настоящего Пользовательского соглашения. В случае несогласия с любым из пунктов, пожалуйста, воздержитесь от использования нашего сервиса.</p>
+                </div>
+            </div>
+
+            <div class="agreement-check" id="agreementCheck">
+                <input type="checkbox" id="agreeCheckbox">
+                <label for="agreeCheckbox">Я принимаю условия <strong>Пользовательского соглашения</strong></label>
+            </div>
+
+            <div class="agreement-actions">
+                <button class="btn-cancel" id="agreementCancel">ОТМЕНА</button>
+                <button class="btn-agree" id="agreementAccept" disabled>ПЕРЕЙТИ К ОПЛАТЕ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== ПЕРЕКЛЮЧЕНИЕ ЯЗЫКА =====
+        const langData = {
+            ru: {
+                status: "RELOAD • v3.0",
+                desc: ["Мощный, стабильный и современный", "эмулятор для ПК. Максимальная", "производительность и полный контроль."],
+                priceLabel: "ЦЕНА",
+                buyText: "КУПИТЬ",
+                secureText: "Безопасная оплата через Telegram",
+                features: [
+                    "Кастомный дизайн", "Оптимизация конфигов",
+                    "Анлок фпса по бинду", "Вылетов полностью нету",
+                    "Добавлен прицел (настраиваемый)", "Улучшен движок и андроид",
+                    "Discord RPC", "Настраиваемые бинды",
+                    "Вырезана реклама полностью", "Удобный автоустановщик",
+                    "Нету синих экранов на Windows 11"
+                ],
+                cf: ["Полный доступ ко всем функциям", "Бесплатные обновления", "Техническая поддержка 24/7", "Без скрытых платежей"]
+            },
+            en: {
+                status: "RELOAD • v3.0",
+                desc: ["Powerful, stable and modern", "PC emulator. Maximum", "performance and full control."],
+                priceLabel: "PRICE",
+                buyText: "BUY",
+                secureText: "Secure payment via Telegram",
+                features: [
+                    "Custom design", "Config optimization",
+                    "FPS unlock by bind", "No crashes at all",
+                    "Aim (customizable)", "Improved engine and Android",
+                    "Discord RPC", "Customizable binds",
+                    "No ads", "Convenient auto-installer",
+                    "No blue screens on Windows 11"
+                ],
+                cf: ["Full access to all features", "Free updates", "24/7 technical support", "No hidden fees"]
+            }
+        };
+
+        let currentLang = 'ru';
+        const langToggle = document.getElementById('langToggle');
+        const langLabel = document.getElementById('langLabel');
+
+        function updateLanguage(lang) {
+            const data = langData[lang];
+            document.getElementById('statusText').textContent = data.status;
+            document.getElementById('descLine1').textContent = data.desc[0];
+            document.getElementById('descLine2').textContent = data.desc[1];
+            document.getElementById('descLine3').textContent = data.desc[2];
+            document.getElementById('priceLabel').textContent = data.priceLabel;
+            document.getElementById('buyText').textContent = data.buyText;
+            document.getElementById('secureText').textContent = data.secureText;
+
+            const fTexts = document.querySelectorAll('.f-text');
+            data.features.forEach((text, i) => {
+                if (fTexts[i]) fTexts[i].textContent = text;
+            });
+
+            const cfTexts = document.querySelectorAll('.cf-text');
+            data.cf.forEach((text, i) => {
+                if (cfTexts[i]) cfTexts[i].textContent = text;
+            });
+
+            langLabel.textContent = lang.toUpperCase();
+            currentLang = lang;
+        }
+
+        langToggle.addEventListener('click', () => {
+            const nextLang = currentLang === 'ru' ? 'en' : 'ru';
+            updateLanguage(nextLang);
+        });
+
+        // ===== ПЕРЕКЛЮЧЕНИЕ ВАЛЮТЫ =====
+        const currencies = {
+            RUB: { symbol: '₽', rate: 1 },
+            USD: { symbol: '$', rate: 0.011 },
+            EUR: { symbol: '€', rate: 0.010 }
+        };
+        let currentCurrency = 'RUB';
+        const basePrice = 550;
+        const currencyToggle = document.getElementById('currencyToggle');
+        const currencyLabel = document.getElementById('currencyLabel');
+        const priceDisplay = document.getElementById('priceDisplay');
+        const currencySymbol = document.getElementById('currencySymbol');
+
+        function updateCurrency(code) {
+            const data = currencies[code];
+            const converted = Math.round(basePrice * data.rate);
+            priceDisplay.textContent = converted;
+            currencySymbol.textContent = data.symbol;
+            currencyLabel.textContent = code;
+            currentCurrency = code;
+        }
+
+        currencyToggle.addEventListener('click', () => {
+            const keys = Object.keys(currencies);
+            const idx = keys.indexOf(currentCurrency);
+            const next = keys[(idx + 1) % keys.length];
+            updateCurrency(next);
+        });
+
+        // ===== ПРЕЛОАДЕР =====
+        const preloader = document.getElementById('preloader');
+        const preloaderPercent = document.getElementById('preloaderPercent');
+        const interfaceEl = document.getElementById('interface');
+
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 2.2 + 0.6;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(interval);
+                setTimeout(() => {
+                    preloader.classList.add('hidden');
+                    interfaceEl.classList.add('visible');
+                }, 400);
+            }
+            preloaderPercent.textContent = Math.floor(progress) + '%';
+        }, 60);
+
+        // ===== ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ =====
+        const agreementOverlay = document.getElementById('agreementOverlay');
+        const agreeCheckbox = document.getElementById('agreeCheckbox');
+        const agreementAccept = document.getElementById('agreementAccept');
+        const agreementCancel = document.getElementById('agreementCancel');
+
+        function openAgreement() {
+            agreementOverlay.classList.add('active');
+            agreeCheckbox.checked = false;
+            agreementAccept.disabled = true;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeAgreement() {
+            agreementOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        agreeCheckbox.addEventListener('change', () => {
+            agreementAccept.disabled = !agreeCheckbox.checked;
+        });
+
+        agreementAccept.addEventListener('click', () => {
+            if (agreeCheckbox.checked) {
+                closeAgreement();
+                window.open('https://t.me/ianchikhevibot', '_blank');
+            }
+        });
+
+        agreementCancel.addEventListener('click', closeAgreement);
+
+        // ===== КНОПКА ПОКУПКИ =====
+        document.getElementById('buyBtn').addEventListener('click', openAgreement);
+
+        // ===== 3D ЖИВЫЕ ОБОИ (ВЕСЬ ЭКРАН) =====
+        const canvas = document.getElementById('three-canvas');
+        const ctx = canvas.getContext('2d');
+        let w, h;
+        let particles = [];
+        let mouseX = 0, mouseY = 0;
+
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / w) * 2 - 1;
+            mouseY = (e.clientY / h) * 2 - 1;
+        });
+
+        class Particle3D {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = (Math.random() - 0.5) * 3;
+                this.y = (Math.random() - 0.5) * 3;
+                this.z = Math.random() * 3 - 1.5;
+                this.size = Math.random() * 3 + 0.5;
+                this.opacity = Math.random() * 0.35 + 0.05;
+                this.speed = 0.001 + Math.random() * 0.003;
+                this.phase = Math.random() * Math.PI * 2;
+                this.phaseSpeed = 0.008 + Math.random() * 0.02;
+                this.orbitX = (Math.random() - 0.5) * 0.025;
+                this.orbitY = (Math.random() - 0.5) * 0.025;
+                this.hue = Math.random() * 60 + 220;
+            }
+            update(time) {
+                const angle = time * this.speed;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                
+                let x = this.x * cos - this.z * sin;
+                let z = this.x * sin + this.z * cos;
+                this.x = x;
+                this.z = z;
+
+                this.x += Math.sin(this.phase) * this.orbitX;
+                this.y += Math.cos(this.phase) * this.orbitY;
+                this.phase += this.phaseSpeed;
+
+                this.x += mouseX * 0.0015;
+                this.y += mouseY * 0.0015;
+
+                if (Math.abs(this.x) > 2.5) this.x *= -0.9;
+                if (Math.abs(this.y) > 2.5) this.y *= -0.9;
+                if (Math.abs(this.z) > 2.5) this.z *= -0.9;
+            }
+            draw() {
+                const perspective = 900;
+                const scale = perspective / (perspective + this.z * 200);
+                const px = (this.x * scale * w / 2.5) + w / 2;
+                const py = (this.y * scale * h / 2.5) + h / 2;
+                const size = this.size * scale * 1.3;
+
+                if (px < -50 || px > w + 50 || py < -50 || py > h + 50) return;
+
+                const alpha = this.opacity * (0.6 + 0.4 * scale);
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.015)';
+                ctx.shadowBlur = size * 3;
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        for (let i = 0; i < 250; i++) particles.push(new Particle3D());
+
+        let time = 0;
+
+        function animate3D() {
+            time += 0.01;
+            ctx.clearRect(0, 0, w, h);
+
+            // Соединительные линии
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dz = particles[i].z - particles[j].z;
+                    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    if (dist < 0.9) {
+                        const perspective = 900;
+                        const scale1 = perspective / (perspective + particles[i].z * 200);
+                        const scale2 = perspective / (perspective + particles[j].z * 200);
+                        const px1 = (particles[i].x * scale1 * w / 2.5) + w / 2;
+                        const py1 = (particles[i].y * scale1 * h / 2.5) + h / 2;
+                        const px2 = (particles[j].x * scale2 * w / 2.5) + w / 2;
+                        const py2 = (particles[j].y * scale2 * h / 2.5) + h / 2;
+                        
+                        const alpha = 0.018 * (1 - dist / 0.9);
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                        ctx.lineWidth = 0.4;
+                        ctx.beginPath();
+                        ctx.moveTo(px1, py1);
+                        ctx.lineTo(px2, py2);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            particles.forEach(p => {
+                p.update(time);
+                p.draw();
+            });
+
+            // Светящиеся пятна
+            for (let i = 0; i < 6; i++) {
+                const angle = time * 0.08 + i * 1.1;
+                const radius = 1.4 + Math.sin(time * 0.04 + i) * 0.4;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle * 0.7) * radius * 0.6;
+                const z = Math.sin(angle * 0.5) * 0.6;
+                
+                const perspective = 900;
+                const scale = perspective / (perspective + z * 200);
+                const px = (x * scale * w / 2.5) + w / 2;
+                const py = (y * scale * h / 2.5) + h / 2;
+                
+                const grad = ctx.createRadialGradient(px, py, 0, px, py, 120 * scale);
+                grad.addColorStop(0, `rgba(255, 255, 255, ${0.012 * scale})`);
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(px - 120 * scale, py - 120 * scale, 240 * scale, 240 * scale);
+            }
+
+            requestAnimationFrame(animate3D);
+        }
+        animate3D();
+
+        // Закрытие соглашения по клику вне окна
+        agreementOverlay.addEventListener('click', (e) => {
+            if (e.target === agreementOverlay) {
+                closeAgreement();
+            }
+        });
+    </script>
+</body>
+</html>
